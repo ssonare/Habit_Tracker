@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Habit Tracker{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        // Apply theme immediately to prevent flash
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+    <style>
+        :root {
+            /* Light theme default values */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f3f4f6;
+            --text-primary: #111827;
+            --text-secondary: #4b5563;
+            --border-color: #e5e7eb;
+            --modal-overlay: rgba(0, 0, 0, 0.5);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1f2937;
+            --bg-secondary: #111827;
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --border-color: #374151;
+            --modal-overlay: rgba(0, 0, 0, 0.7);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .modal {
+            background-color: var(--modal-overlay);
+        }
+
+        .modal-content {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Dark mode form elements */
+        [data-theme="dark"] input,
+        [data-theme="dark"] select,
+        [data-theme="dark"] textarea {
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark"] input::placeholder,
+        [data-theme="dark"] textarea::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .bg-theme-primary { background-color: var(--bg-primary); }
+        .bg-theme-secondary { background-color: var(--bg-secondary); }
+        .text-theme-primary { color: var(--text-primary); }
+        .text-theme-secondary { color: var(--text-secondary); }
+        .border-theme { border-color: var(--border-color); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+
+        .settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .settings-modal.active {
+            display: flex;
+        }
+
+        .settings-content {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+        }
+
+        /* Toggle switch styles */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #2563eb;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+                /* Offline banner theming */
+        #offlineBanner {
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        [data-theme="dark"] #offlineBanner {
+            background-color: #b91c1c;
+            color: #fef2f2;
+        }
+
+        [data-theme="dark"] #offlineBanner button {
+            background-color: #fef2f2;
+            color: #b91c1c;
+        }
+
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen bg-theme-primary flex flex-col transition-colors duration-200">
+    <div id="offlineBanner"
+         class="hidden fixed top-0 left-0 right-0 bg-red-500 text-white py-3 px-4 shadow-lg"
+         style="z-index: 9999;">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">⚠️</span>
+                <div>
+                    <p class="font-semibold">You’re offline</p>
+                    <p class="text-sm text-red-100">
+                        Please check your internet connection to sync your latest changes.
+                    </p>
+                </div>
+            </div>
+            <button type="button"
+                    onclick="dismissOfflineBanner()"
+                    class="text-xs sm:text-sm font-medium bg-white text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50">
+                Dismiss
+            </button>
+        </div>
+    </div>
+    <nav class="bg-theme-primary backdrop-blur-md shadow-sm border-b border-theme sticky top-0 z-50 transition-colors duration-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex flex-col">
+                        <span class="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Habit Tracker</span>
+                        <span class="text-xs text-theme-secondary">Build Better Habits</span>
+                    </a>
+                </div>
+                <div class="flex items-center gap-4">
+
+                    <!-- Pomodoro Timer (only show when authenticated AND not on signin page) -->
+                    {% if session.get('authenticated') and request.endpoint != 'signin' %}
+                    <a href="{{ url_for('pomodoro_timer') }}"
+                    class="flex items-center gap-2 px-4 py-2 rounded-xl
+                            bg-theme-secondary hover:opacity-80 transition-colors shadow-sm border border-theme"
+                    title="Pomodoro Timer">
+
+                        <svg class="w-5 h-5 text-theme-primary"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 8v4l3 3m4-3a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+
+                        <span class="text-sm font-medium text-theme-primary">
+                            Pomodoro Timer
+                        </span>
+                    </a>
+                    {% endif %}
+
+
+
+
+                    <!-- Statistics Link (only show when authenticated AND not on signin page) -->
+                    {% if session.get('authenticated') and request.endpoint != 'signin' %}
+                    <a href="{{ url_for('habit_stats') }}"
+                       class="p-2 rounded-lg bg-theme-secondary hover:opacity-80 transition-colors"
+                       title="Statistics">
+                        <svg class="w-6 h-6 text-theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </a>
+                    {% endif %}
+
+                    <!-- Notification Bell Icon (only show when authenticated AND not on signin page) -->
+                    {% if session.get('authenticated') and request.endpoint != 'signin' %}
+                    <button onclick="toggleNotifications()"
+                            class="p-2 rounded-lg bg-theme-secondary hover:opacity-80 transition-colors relative"
+                            title="Notifications"
+                            id="notificationBell">
+                        <svg class="w-6 h-6 text-theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                        </svg>
+                        <!-- Notification Count Badge -->
+                        <span id="notificationCount" class="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
+                    </button>
+                    {% endif %}
+
+                    <button onclick="openSettings()"
+                            class="p-2 rounded-lg bg-theme-secondary hover:opacity-80 transition-colors"
+                            title="Settings">
+                        <svg class="w-6 h-6 text-theme-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="mobileMenu" class="hidden md:hidden bg-white border-t border-gray-100">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="animate-fade-in">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </main>
+
+    <!-- Tips Modal -->
+    <div id="tipsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden" role="dialog" aria-modal="true" tabindex="0" aria-labelledby="tips-modal-title">
+        <div class="min-h-screen px-4 text-center">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="inline-block h-screen align-middle" aria-hidden="true">&#8203;</span>
+            <div class="inline-block w-full max-w-2xl p-6 my-8 text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 id="tips-modal-title" class="text-2xl font-bold text-gray-900">Welcome to Habit Tracker! 🌟</h3>
+                    <button type="button" onclick="closeTipsModal()" class="text-gray-400 hover:text-gray-500">
+                        <span class="sr-only">Close</span>
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="space-y-6">
+                    <div class="relative bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 p-4 rounded-lg overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-transparent"></div>
+                        <div class="relative">
+                            <h4 class="text-lg font-semibold text-purple-800 dark:text-purple-300 mb-2 flex items-center gap-2">
+                                <span class="flex-shrink-0">1. Create Your First Habit</span>
+                                <span class="text-2xl">📝</span>
+                            </h4>
+                            <p class="text-purple-700 dark:text-purple-200">Start by clicking "Plant a New Habit" and give it a meaningful name and description.</p>
+                        </div>
+                    </div>
+                    <div class="relative bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 p-4 rounded-lg overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent"></div>
+                        <div class="relative">
+                            <h4 class="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
+                                <span class="flex-shrink-0">2. Track Daily Progress</span>
+                                <span class="text-2xl">✅</span>
+                            </h4>
+                            <p class="text-blue-700 dark:text-blue-200">Click the circle next to your habit to mark it as complete for the day.</p>
+                        </div>
+                    </div>
+                    <div class="relative bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 p-4 rounded-lg overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-r from-green-500/10 to-transparent"></div>
+                        <div class="relative">
+                            <h4 class="text-lg font-semibold text-green-800 dark:text-green-300 mb-2 flex items-center gap-2">
+                                <span class="flex-shrink-0">3. Build Streaks</span>
+                                <span class="text-2xl">🔥</span>
+                            </h4>
+                            <p class="text-green-700 dark:text-green-200">Keep your streak going by completing your habits consistently.</p>
+                        </div>
+                    </div>
+                    <div class="relative bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/40 dark:to-yellow-800/40 p-4 rounded-lg overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-r from-yellow-500/20 dark:from-yellow-400/20 to-transparent"></div>
+                        <div class="relative">
+                            <h4 class="text-lg font-bold text-red-900 dark:text-yellow-300 mb-2 flex items-center gap-2">
+                                <span class="flex-shrink-0 tracking-wide">4. Manage Your Habits</span>
+                                <span class="text-2xl">⚙️</span>
+                            </h4>
+                            <p class="text-yellow-700 dark:text-yellow-100">Need a break? Use pause/resume. Want to remove old habits? Archive them!</p>
+                            <div class="mt-4 flex gap-2 text-sm">
+                                <span class="inline-flex items-center px-3 py-1.5 rounded-full bg-yellow-100 dark:bg-yellow-600 text-yellow-800 dark:text-yellow-50 border border-yellow-200 dark:border-yellow-500 shadow-sm font-medium">
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Pause
+                                </span>
+                                <span class="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-600 text-blue-800 dark:text-blue-50 border border-blue-200 dark:border-blue-500 shadow-sm font-medium">
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                                    </svg>
+                                    Archive
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-sm text-center">
+                        <div class="inline-flex items-center justify-center w-8 h-8 bg-purple-100 dark:bg-purple-900/50 rounded-full mb-2">
+                            <span class="text-lg">💡</span>
+                        </div>
+                        <p class="text-gray-600 dark:text-gray-300">You can always access these tips later by clicking "Show Tips" in the footer.</p>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" onclick="closeTipsModal()" 
+                        class="px-4 py-2 text-sm font-bold text-black dark:text-black bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:focus:ring-purple-400 shadow-sm border border-gray-300 dark:border-gray-600">
+                        Got it!
+                    </button>
+                    <form action="{{ url_for('disable_tips') }}" method="POST" class="inline">
+                        <button type="submit"
+                            class="px-4 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 focus:outline-none focus:underline">
+                            Don't show again
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-theme-primary border-t border-theme mt-auto transition-colors duration-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <p class="text-theme-secondary text-sm">© 2025 Habit Tracker app</p>
+                <div class="flex space-x-6 mt-4 md:mt-0">
+                    <a href="https://github.com" class="text-gray-400 hover:text-gray-500">
+                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    </a>
+                    {% if session.get('authenticated') %}
+                    <button onclick="showTipsModal()" class="text-purple-600 hover:text-purple-700">
+                        <span class="text-sm">Show Tips</span>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Notification Panel -->
+    <div id="notificationPanel" class="settings-modal">
+        <div class="settings-content shadow-xl max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-theme-primary">Notifications</h3>
+                <button onclick="closeNotifications()" class="text-theme-secondary hover:text-theme-primary">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="flex justify-between items-center mb-4">
+                <p class="text-sm text-theme-secondary">Your habit activity updates</p>
+                <button onclick="markAllAsRead()" class="text-xs text-blue-600 hover:text-blue-700 font-medium">
+                    Mark all as read
+                </button>
+            </div>
+            
+            <div id="notificationList" class="space-y-2 overflow-y-auto flex-1 pr-2">
+                <p class="text-sm text-theme-secondary text-center py-4">Loading notifications...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="settings-modal">
+        <div class="settings-content shadow-xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-semibold text-theme-primary">Settings</h3>
+                <button onclick="closeSettings()" class="text-theme-secondary hover:text-theme-primary">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="font-medium text-theme-primary">Dark Mode</h4>
+                        <p class="text-sm text-theme-secondary">Toggle dark theme for better viewing in low light</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="border-t border-theme pt-6"></div>
+
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="font-medium text-theme-primary">Push Notifications</h4>
+                        <p class="text-sm text-theme-secondary">Get notified when you add, edit, delete, pause, or archive habits</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="notificationsToggle" onchange="toggleNotificationsEnabled()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="border-t border-theme pt-6"></div>
+
+                <div class="flex flex-col gap-3">
+                    <a href="/logout"
+                    onclick="handleLogout()"
+                       class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all duration-200 shadow-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
+                        <span>Logout</span>
+                    </a>
+                    <p class="text-xs text-center text-theme-secondary">End your session securely</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Theme management
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('darkModeToggle').checked = theme === 'dark';
+            localStorage.setItem('theme', theme);
+        }
+
+        function showTipsModal() {
+            const modal = document.getElementById('tipsModal');
+            modal.classList.remove('hidden');
+        }
+
+        function closeTipsModal() {
+            const modal = document.getElementById('tipsModal');
+            modal.classList.add('hidden');
+        }
+
+        {% if show_tips %}
+            document.addEventListener('DOMContentLoaded', function() {
+                showTipsModal();
+            });
+        {% endif %}
+
+        // Dark mode toggle with error handling and revert on failure
+        async function toggleDarkMode() {
+            const checkbox = document.getElementById('darkModeToggle');
+            const newTheme = checkbox.checked ? 'dark' : 'light';
+            const oldTheme = localStorage.getItem('theme') || 'light';
+            
+            try {
+                const response = await fetch('/theme/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme: newTheme })
+                });
+                
+                if (response.ok) {
+                    applyTheme(newTheme);
+                } else {
+                    console.error('Failed to update theme preference');
+                    checkbox.checked = !checkbox.checked;
+                    applyTheme(oldTheme);
+                }
+            } catch (error) {
+                console.error('Error updating theme:', error);
+                checkbox.checked = !checkbox.checked;
+                applyTheme(oldTheme);
+            }
+        }
+
+        // Load theme preference with fallback
+        async function loadThemePreference() {
+            try {
+                const response = await fetch('/theme/settings');
+                const data = await response.json();
+                applyTheme(data.theme || 'light');
+            } catch (error) {
+                console.error('Error loading theme:', error);
+                applyTheme(localStorage.getItem('theme') || 'light');
+            }
+        }
+
+        // Modal management
+        function openSettings() {
+            document.getElementById('settingsModal').classList.add('active');
+            loadThemePreference(); // Sync theme state
+            loadNotificationPreference(); // Sync notification state
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.remove('active');
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('settingsModal').addEventListener('click', function(e) {
+            if (e.target === this) closeSettings();
+        });
+
+        // Notification management
+        let notificationsData = [];
+
+        async function loadNotifications() {
+            try {
+                const response = await fetch('/notifications');
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                notificationsData = data.notifications;
+                updateNotificationUI(data.notifications, data.unread_count);
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+            }
+        }
+
+        function updateNotificationUI(notifications, unreadCount) {
+            // Update badge count
+            const badge = document.getElementById('notificationCount');
+            if (unreadCount > 0) {
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            // Update notification list
+            const listContainer = document.getElementById('notificationList');
+            if (notifications.length === 0) {
+                listContainer.innerHTML = '<p class="text-sm text-center py-8 text-gray-600 dark:text-gray-400">No notifications yet</p>';
+                return;
+            }
+
+            // Check if dark mode is active
+            const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+            
+            listContainer.innerHTML = notifications.map(notif => {
+                const date = new Date(notif.created_at);
+                const timeAgo = getTimeAgo(date);
+                const isUnread = !notif.is_read;
+                
+                // Choose colors based on theme and read status
+                let bgColor, borderColor, textColor, timeColor;
+                if (isDarkMode) {
+                    if (isUnread) {
+                        bgColor = 'bg-blue-900/30';
+                        borderColor = 'border-blue-700';
+                        textColor = 'text-white';
+                        timeColor = 'text-gray-300';
+                    } else {
+                        bgColor = 'bg-gray-700';
+                        borderColor = 'border-gray-600';
+                        textColor = 'text-gray-100';
+                        timeColor = 'text-gray-400';
+                    }
+                } else {
+                    if (isUnread) {
+                        bgColor = 'bg-blue-50';
+                        borderColor = 'border-blue-300';
+                        textColor = 'text-gray-900';
+                        timeColor = 'text-gray-600';
+                    } else {
+                        bgColor = 'bg-white';
+                        borderColor = 'border-gray-200';
+                        textColor = 'text-gray-800';
+                        timeColor = 'text-gray-500';
+                    }
+                }
+                
+                return `
+                    <div class="p-3 rounded-lg ${bgColor} border-2 ${borderColor} hover:opacity-90 transition-all cursor-pointer"
+                         onclick="markNotificationAsRead(${notif.id})">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-lg">${getActionIcon(notif.action_type)}</span>
+                                    ${isUnread ? '<span class="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></span>' : ''}
+                                </div>
+                                <p class="text-sm font-semibold break-words ${textColor}">${notif.message}</p>
+                                <p class="text-xs mt-1 ${timeColor}">${timeAgo}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getActionIcon(actionType) {
+            const icons = {
+                'added': '➕',
+                'deleted': '🗑️',
+                'paused': '⏸️',
+                'resumed': '▶️',
+                'archived': '📦',
+                'unarchived': '📤',
+                'edited': '✏️'
+            };
+            return icons[actionType] || '📌';
+        }
+
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            if (seconds < 60) return 'Just now';
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+            return date.toLocaleDateString();
+        }
+
+        function toggleNotifications() {
+            const panel = document.getElementById('notificationPanel');
+            if (panel.classList.contains('active')) {
+                closeNotifications();
+            } else {
+                panel.classList.add('active');
+                loadNotifications();
+            }
+        }
+
+        function closeNotifications() {
+            document.getElementById('notificationPanel').classList.remove('active');
+        }
+
+        async function markNotificationAsRead(notificationId) {
+            try {
+                await fetch(`/notifications/${notificationId}/read`, { method: 'POST' });
+                loadNotifications(); // Refresh
+            } catch (error) {
+                console.error('Error marking notification as read:', error);
+            }
+        }
+
+        async function markAllAsRead() {
+            try {
+                await fetch('/notifications/read-all', { method: 'POST' });
+                loadNotifications(); // Refresh
+            } catch (error) {
+                console.error('Error marking all notifications as read:', error);
+            }
+        }
+
+        async function toggleNotificationsEnabled() {
+            const checkbox = document.getElementById('notificationsToggle');
+            const originalState = checkbox.checked;
+            
+            try {
+                const response = await fetch('/notifications/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    checkbox.checked = data.notifications_enabled;
+                    console.log('Notifications toggled:', data.notifications_enabled);
+                } else {
+                    console.error('Failed to toggle notifications');
+                    checkbox.checked = originalState; // Revert to original
+                }
+            } catch (error) {
+                console.error('Error toggling notifications:', error);
+                checkbox.checked = originalState; // Revert to original
+            }
+        }
+
+        async function loadNotificationPreference() {
+            try {
+                const response = await fetch('/notifications/settings');
+                if (response.ok) {
+                    const data = await response.json();
+                    const checkbox = document.getElementById('notificationsToggle');
+                    checkbox.checked = data.notifications_enabled;
+                    console.log('Loaded notification preference:', data.notifications_enabled);
+                } else {
+                    console.error('Failed to load notification preference');
+                }
+            } catch (error) {
+                console.error('Error loading notification preference:', error);
+                // Default to true if there's an error
+                document.getElementById('notificationsToggle').checked = true;
+            }
+        }
+
+        // Close notification panel when clicking outside
+        document.getElementById('notificationPanel').addEventListener('click', function(e) {
+            if (e.target === this) closeNotifications();
+        });
+
+        // Initialize theme
+        loadThemePreference();
+
+        // Load notifications on page load if authenticated
+        {% if session.get('authenticated') %}
+        document.addEventListener('DOMContentLoaded', function() {
+            loadNotifications();
+            // Refresh notification count every 30 seconds
+            setInterval(loadNotifications, 30000);
+        });
+        {% endif %}
+
+        // Keep theme in sync across tabs
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) loadThemePreference();
+        });
+
+        // Keep theme in sync across tabs
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) loadThemePreference();
+        });
+
+        // ===== Offline / Online banner =====
+        const offlineBanner = document.getElementById('offlineBanner');
+
+        function showOfflineBanner() {
+            if (!offlineBanner) return;
+            offlineBanner.classList.remove('hidden');
+            document.body.style.paddingTop = '60px';
+        }
+
+        function hideOfflineBanner() {
+            if (!offlineBanner) return;
+            offlineBanner.classList.add('hidden');
+            document.body.style.paddingTop = '0px';
+        }
+
+        function dismissOfflineBanner() {
+            hideOfflineBanner();
+        }
+
+        window.addEventListener('offline', () => {
+            console.log('[OFFLINE] Browser lost connection');
+            showOfflineBanner();
+        });
+
+        window.addEventListener('online', () => {
+            console.log('[ONLINE] Connection restored');
+            hideOfflineBanner();
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!navigator.onLine) {
+                showOfflineBanner();
+            }
+        });
+
+                // Clear certain localStorage keys on logout
+        function handleLogout() {
+            try {
+                // Reset Pomodoro info popup so it shows next login
+                localStorage.removeItem("pomodoroInfoSeen");
+            } catch (e) {
+                console.error("Error clearing Pomodoro info flag on logout:", e);
+            }
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Tracker - Build Better Habits</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.4); }
+            50% { box-shadow: 0 0 40px rgba(168, 85, 247, 0.8); }
+        }
+
+        /* Dark mode variables */
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9fafb;
+            --text-primary: #111827;
+            --text-secondary: #4b5563;
+            --border-color: #e5e7eb;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1b1e;
+            --bg-secondary: #2a2b2e;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --border-color: #374151;
+        }
+
+        [data-theme="dark"] body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        [data-theme="dark"] .bg-white {
+            background-color: var(--bg-secondary);
+        }
+
+        [data-theme="dark"] .text-gray-900 {
+            color: var(--text-primary);
+        }
+
+        [data-theme="dark"] .text-gray-700,
+        [data-theme="dark"] .text-gray-600 {
+            color: var(--text-secondary);
+        }
+
+        [data-theme="dark"] .border-gray-200 {
+            border-color: var(--border-color);
+        }
+
+        [data-theme="dark"] .bg-gradient-to-br.from-purple-50 {
+            background: var(--bg-secondary);
+        }
+
+        [data-theme="dark"] .border-purple-100 {
+            border-color: rgba(167, 139, 250, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen"
+    x-data="{ darkMode: false }"
+    x-init="() => {
+        // Initialize theme from server or localStorage
+        async function loadTheme() {
+            try {
+                const response = await fetch('/theme/settings');
+                const data = await response.json();
+                darkMode = data.theme === 'dark';
+            } catch (error) {
+                console.error('Error loading theme:', error);
+                darkMode = localStorage.getItem('theme') === 'dark';
+            }
+        }
+        loadTheme();
+    }"
+>
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div>
+                    <a href="#" class="text-xl font-bold text-purple-600">Habit Tracker</a>
+                    <p class="text-xs text-gray-500">Build Better Habits</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <!-- Settings Button -->
+                    <button
+                        class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        @click="$dispatch('open-settings')"
+                        aria-label="Open settings"
+                    >
+                        <svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
+
+                    <a href="{{ url_for('signin') }}" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium">
+                        Sign In
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <main>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <!-- Get Started Section -->
+            <div class="max-w-4xl mx-auto mb-16">
+                <div class="bg-gradient-to-br from-purple-50 via-indigo-50 to-purple-50 rounded-3xl p-12 border-2 border-purple-200 shadow-xl">
+                    <div class="flex items-start gap-6">
+                        <div class="flex-shrink-0">
+                            <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-2xl font-bold text-2xl shadow-lg">
+                                🚀
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <h2 class="text-2xl font-bold text-gray-900 mb-3">Get Started</h2>
+                            <p class="text-lg text-gray-700 leading-relaxed">
+                                Add your habits, start working on them, and stay consistent and focused. Build the routines that will transform your daily life, one small step at a time.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Why Choose Section -->
+            <div class="max-w-6xl mx-auto mb-16">
+                <h2 class="text-4xl font-bold text-center mb-12 text-gray-900">Why Choose Habit Tracker?</h2>
+                
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="group relative">
+                        <div class="absolute -inset-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
+                        <div class="relative bg-white p-8 rounded-2xl border border-purple-100">
+                            <div class="text-5xl mb-4">🎯</div>
+                            <h3 class="text-xl font-bold mb-3 text-gray-900">Stay Focused</h3>
+                            <p class="text-gray-600">
+                                Minimize distractions with a clean, minimalist interface that keeps your attention on what matters most.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="group relative">
+                        <div class="absolute -inset-1 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
+                        <div class="relative bg-white p-8 rounded-2xl border border-purple-100">
+                            <div class="text-5xl mb-4">📈</div>
+                            <h3 class="text-xl font-bold mb-3 text-gray-900">Track Progress</h3>
+                            <p class="text-gray-600">
+                                Watch your streaks grow and celebrate your wins. Visual progress tracking keeps you motivated every day.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="group relative">
+                        <div class="absolute -inset-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
+                        <div class="relative bg-white p-8 rounded-2xl border border-purple-100">
+                            <div class="text-5xl mb-4">🔥</div>
+                            <h3 class="text-xl font-bold mb-3 text-gray-900">Build Streaks</h3>
+                            <p class="text-gray-600">
+                                Keep your momentum going with streak counters that encourage consistency and long-term success.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA Button -->
+            <div class="text-center py-12">
+                <a href="{{ url_for('signin') }}" class="inline-block px-12 py-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full font-bold text-xl shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105">
+                    Start Building Better Habits Today ✨
+                </a>
+                <p class="text-gray-600 mt-6 text-sm">Sign in to get started • Secure authentication • Free to use</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Settings Modal -->
+    <div
+        x-data="{ isOpen: false }"
+        @open-settings.window="isOpen = true"
+        @keydown.escape.window="isOpen = false"
+        x-show="isOpen"
+        class="fixed inset-0 z-50 overflow-y-auto"
+        aria-labelledby="modal-title"
+        x-cloak
+    >
+        <!-- Backdrop -->
+        <div class="fixed inset-0 bg-black bg-opacity-50" @click="isOpen = false"></div>
+
+        <!-- Modal -->
+        <div class="fixed right-0 top-0 h-full w-80 bg-white dark:bg-gray-800 shadow-lg transform transition-transform duration-300"
+             :class="{ 'translate-x-0': isOpen, 'translate-x-full': !isOpen }">
+            
+            <!-- Header -->
+            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Settings</h2>
+                <button @click="isOpen = false" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="p-4">
+                <div class="flex items-center justify-between py-3">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-900 dark:text-white">Dark Mode</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Toggle dark theme for better viewing in low light</p>
+                    </div>
+                    <button
+                        @click="async () => {
+                            const newTheme = !darkMode ? 'dark' : 'light';
+                            try {
+                                const response = await fetch('/theme/toggle', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ theme: newTheme })
+                                });
+                                
+                                if (response.ok) {
+                                    darkMode = !darkMode;
+                                    document.documentElement.setAttribute('data-theme', newTheme);
+                                    localStorage.setItem('theme', newTheme);
+                                }
+                            } catch (error) {
+                                console.error('Error updating theme:', error);
+                            }
+                        }"
+                        class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                        :class="{ 'bg-purple-600': darkMode, 'bg-gray-200': !darkMode }"
+                        role="switch"
+                        :aria-checked="darkMode"
+                    >
+                        <span
+                            aria-hidden="true"
+                            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                            :class="{ 'translate-x-5': darkMode, 'translate-x-0': !darkMode }"
+                        ></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
